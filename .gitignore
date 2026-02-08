@@ -1,0 +1,15 @@
+citys/
+
+*.MOV
+*.mov
+*.mp4
+*.MP4
+*.avi
+*.mkv
+*.py
+
+.venv/
+__pycache__/
+*.pyc
+
+*.log
