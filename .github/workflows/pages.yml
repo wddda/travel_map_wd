@@ -1,10 +1,8 @@
-name: Deploy to GitHub Pages with LFS
+name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main ]  # 或你的默认分支
-
-  # 允许手动触发
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -18,27 +16,44 @@ concurrency:
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout with LFS
+      # 1. 检出代码，关键：启用 lfs: true
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          lfs: true  # 关键：启用 LFS 拉取
+          fetch-depth: 0
+          lfs: true  # 关键：拉取实际文件，不是指针
 
-      - name: Pull LFS files
-        run: git lfs pull
+      # 2. 验证 LFS 文件已正确检出（调试用，可删除）
+      - name: Verify LFS files
+        run: |
+          git lfs ls-files
+          ls -la citys/  # 检查你的图片目录
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
+      # 3. 关键步骤：移除 LFS，让文件变成普通文件
+      - name: Disable LFS and prepare files
+        run: |
+          git lfs uninstall
+          rm -f .gitattributes
+          rm -rf .git
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'  # 部署整个仓库，或改为你的构建输出目录
-
+      # 4. 部署到 gh-pages 分支（使用 peaceiris/actions-gh-pages）
       - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          publish_branch: gh-pages
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          
+      # 或者使用官方的 GitHub Pages 部署（推荐）
+      # - name: Upload artifact
+      #   uses: actions/upload-pages-artifact@v3
+      #   with:
+      #     path: '.'
+      # 
+      # - name: Deploy to GitHub Pages
+      #   id: deployment
+      #   uses: actions/deploy-pages@v4
