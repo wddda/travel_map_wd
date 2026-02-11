@@ -1,59 +1,69 @@
-name: Deploy to GitHub Pages
+name: Deploy to GitHub Pages with LFS
 
 on:
+  # 在推送到 main 分支时触发部署
   push:
-    branches: [ main ]
+    branches: ["main"]
+  
+  # 允许手动触发部署
   workflow_dispatch:
 
+# 设置 GITHUB_TOKEN 的权限
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# 允许并发部署，但正在进行的部署会被取消
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  # 构建任务
+  build:
     runs-on: ubuntu-latest
     steps:
-      # 1. 检出代码，关键：启用 lfs: true
-      - name: Checkout
+      - name: Checkout repository with LFS
         uses: actions/checkout@v4
         with:
+          # 关键：启用 LFS 拉取实际文件
+          lfs: true
           fetch-depth: 0
-          lfs: true  # 关键：拉取实际文件，不是指针
 
-      # 2. 验证 LFS 文件已正确检出（调试用，可删除）
-      - name: Verify LFS files
+      - name: Pull LFS files
         run: |
-          git lfs ls-files
-          ls -la citys/  # 检查你的图片目录
+          git lfs pull
+          # 验证 LFS 文件是否正确拉取
+          echo "=== LFS 文件检查 ==="
+          find . -name "*.jpg" -o -name "*.jpeg" -o -name "*.png" -o -name "*.mov" -o -name "*.mp4" | head -20
+          ls -lh ./citys/ 2>/dev/null || echo "citys 目录不存在或为空"
 
-      # 3. 关键步骤：移除 LFS，让文件变成普通文件
-      - name: Disable LFS and prepare files
-        run: |
-          git lfs uninstall
-          rm -f .gitattributes
-          rm -rf .git
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
 
-      # 4. 部署到 gh-pages 分支（使用 peaceiris/actions-gh-pages）
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Build with Jekyll (可选)
+        uses: actions/jekyll-build-pages@v1
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./
-          publish_branch: gh-pages
-          user_name: 'github-actions[bot]'
-          user_email: 'github-actions[bot]@users.noreply.github.com'
-          
-      # 或者使用官方的 GitHub Pages 部署（推荐）
-      # - name: Upload artifact
-      #   uses: actions/upload-pages-artifact@v3
-      #   with:
-      #     path: '.'
-      # 
-      # - name: Deploy to GitHub Pages
-      #   id: deployment
-      #   uses: actions/deploy-pages@v4
+          source: ./
+          destination: ./_site
+        # 如果你不需要 Jekyll，可以直接上传根目录，注释掉这一步
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # 如果你用了 Jekyll，路径是 ./_site
+          # 如果不用 Jekyll，路径是 ./
+          path: './'
+
+  # 部署任务
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
